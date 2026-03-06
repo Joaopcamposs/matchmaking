@@ -1,9 +1,17 @@
 [project]
 name = "matchmaking"
 version = "0.1.0"
-description = "Add your description here"
+description = "Game matchmaking simulator"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.115.0",
     "sqlalchemy>=2.0.48",
-    "uuid>=1.30",
+    "pytest>=8.3.5",
+    "httpx>=0.28.1",
+    "uvicorn>=0.34.0",
+    "ruff>=0.15.5",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
