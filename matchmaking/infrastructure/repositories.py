@@ -34,6 +34,60 @@ class SqlAlchemyPlayerRepository:
             ).all()
         return [self._to_entity(row) for row in rows]
 
+    def get_player(self, player_id: UUID) -> Player | None:
+        """Busca um jogador específico pelo identificador."""
+
+        with self._context.session_factory() as session:
+            row = session.get(PlayerModel, str(player_id))
+        if row is None:
+            return None
+        return self._to_entity(row)
+
+    def create_player(self, player: Player) -> Player:
+        """Cria um novo jogador persistido."""
+
+        with self._context.session_factory() as session:
+            session.add(
+                PlayerModel(
+                    id=str(player.id),
+                    name=player.name,
+                    karma=player.karma,
+                    kills=player.kills,
+                    deaths=player.deaths,
+                    escapes=player.escapes,
+                    revives=player.revives,
+                )
+            )
+            session.commit()
+        return player
+
+    def update_player(self, player: Player) -> Player | None:
+        """Atualiza um jogador existente."""
+
+        with self._context.session_factory() as session:
+            row = session.get(PlayerModel, str(player.id))
+            if row is None:
+                return None
+            row.name = player.name
+            row.karma = player.karma
+            row.kills = player.kills
+            row.deaths = player.deaths
+            row.escapes = player.escapes
+            row.revives = player.revives
+            session.commit()
+        return player
+
+    def delete_player(self, player_id: UUID) -> bool:
+        """Remove um jogador existente."""
+
+        with self._context.session_factory() as session:
+            row = session.get(PlayerModel, str(player_id))
+            if row is None:
+                return False
+            session.delete(row)
+            session.commit()
+        return True
+
     def save_players(self, players: list[Player]) -> None:
         """Persiste o estado consolidado dos jogadores após as partidas."""
 
@@ -186,6 +240,52 @@ class SqlAlchemyMatchRepository:
             ).all()
         return [UUID(value) for value in values]
 
+    def list_actions(self) -> list[dict]:
+        """Lista todas as ações persistidas em ordem cronológica."""
+
+        with self._context.session_factory() as session:
+            rows = session.scalars(
+                select(MatchActionModel).order_by(
+                    MatchActionModel.created_at.asc(),
+                    MatchActionModel.happened_at_second.asc(),
+                )
+            ).all()
+        return [self._action_to_dict(row) for row in rows]
+
+    def get_match_report(self, match_id: UUID) -> dict | None:
+        """Retorna um relatório completo de uma partida persistida."""
+
+        with self._context.session_factory() as session:
+            match_row = session.get(MatchModel, str(match_id))
+            if match_row is None:
+                return None
+
+            action_rows = session.scalars(
+                select(MatchActionModel)
+                .where(MatchActionModel.match_id == str(match_id))
+                .order_by(
+                    MatchActionModel.happened_at_second.asc(),
+                    MatchActionModel.created_at.asc(),
+                )
+            ).all()
+
+        actions = [self._action_to_dict(row) for row in action_rows]
+        return {
+            "match_id": UUID(match_row.id),
+            "started_at": match_row.started_at,
+            "ended_at": match_row.ended_at,
+            "duration_seconds": match_row.duration_seconds,
+            "player_count": match_row.player_count,
+            "npc_count": match_row.npc_count,
+            "total_actions": len(actions),
+            "total_kills": sum(1 for action in actions if action["killed"]),
+            "total_revives": sum(1 for action in actions if action["revived"]),
+            "total_escapes": sum(1 for action in actions if action["escaped"]),
+            "total_stuns": sum(1 for action in actions if action["stunned"]),
+            "total_damage": sum(action["damage"] for action in actions),
+            "actions": actions,
+        }
+
     @staticmethod
     def _to_action_model(action: MatchAction) -> MatchActionModel:
         """Converte uma entidade de ação para o modelo ORM."""
@@ -205,3 +305,23 @@ class SqlAlchemyMatchRepository:
             happened_at_second=action.happened_at_second,
             created_at=action.created_at,
         )
+
+    @staticmethod
+    def _action_to_dict(action: MatchActionModel) -> dict:
+        """Converte o modelo ORM de ação para uma estrutura serializável."""
+
+        return {
+            "id": UUID(action.id),
+            "match_id": UUID(action.match_id),
+            "actor_id": UUID(action.actor_id),
+            "target_id": UUID(action.target_id) if action.target_id else None,
+            "action_type": action.action_type,
+            "damage": action.damage,
+            "killed": action.killed,
+            "revived": action.revived,
+            "stunned": action.stunned,
+            "escaped": action.escaped,
+            "actor_karma_delta": action.actor_karma_delta,
+            "happened_at_second": action.happened_at_second,
+            "created_at": action.created_at,
+        }
