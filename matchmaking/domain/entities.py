@@ -40,11 +40,13 @@ class MatchParticipant:
     difficulty: float = 0.0
     life: int = 100
     alive: bool = True
+    spawned: bool = True
     stunned: bool = False
     stunned_life: int = 0
     escaped: bool = False
     kills: int = 0
     deaths: int = 0
+    escapes: int = 0
     revives: int = 0
 
     def can_receive_damage(self) -> bool:
@@ -94,7 +96,7 @@ class Match:
     def living_npcs(self) -> list[MatchParticipant]:
         """Retorna NPCs ainda vivos na partida."""
 
-        return [npc for npc in self.npcs if npc.alive]
+        return [npc for npc in self.npcs if npc.spawned and npc.alive]
 
     def active_participants(self) -> list[MatchParticipant]:
         """Retorna todos os participantes ativos na partida."""
@@ -110,6 +112,7 @@ def build_player_participant(player: Player) -> MatchParticipant:
         name=player.name,
         is_npc=False,
         karma=player.karma,
+        spawned=True,
     )
 
 
@@ -122,6 +125,7 @@ def build_npc_participant(profile: NPCProfile) -> MatchParticipant:
         is_npc=True,
         difficulty=profile.difficulty,
         life=60,
+        spawned=False,
     )
 
 

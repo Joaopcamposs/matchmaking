@@ -6,6 +6,7 @@ class ActionType(str, Enum):
 
     PLAYER_ATTACK = "player_attack"
     NPC_ATTACK = "npc_attack"
+    NPC_SPAWN = "npc_spawn"
     REVIVE = "revive"
     ESCAPE = "escape"
     STUN_TICK = "stun_tick"

@@ -23,6 +23,7 @@ class MatchSimulator:
 
         rng = self._random_factory()
         for second in range(match.duration_seconds):
+            self._spawn_npcs_for_second(match, second)
             self._process_stun_ticks(match, second)
             actors = match.living_players() + match.living_npcs()
             rng.shuffle(actors)
@@ -32,10 +33,33 @@ class MatchSimulator:
                 self._process_actor_turn(match, actor, second, rng)
                 if len(match.living_players()) <= 1:
                     break
-            if len(match.living_players()) <= 1:
-                break
+        self._finalize_players(match, match.duration_seconds)
         match.ended_at = datetime.now(UTC)
         return match
+
+    @staticmethod
+    def _spawn_npcs_for_second(match: Match, second: int) -> None:
+        """Ativa NPCs em diferentes instantes ao longo da partida."""
+
+        if not match.npcs:
+            return
+
+        duration = max(match.duration_seconds, 1)
+        last_second = max(duration - 1, 0)
+        for index, npc in enumerate(match.npcs):
+            spawn_second = min(last_second, (index * duration) // len(match.npcs))
+            if npc.spawned or spawn_second != second:
+                continue
+            npc.spawned = True
+            match.actions.append(
+                new_match_action(
+                    match_id=match.id,
+                    actor_id=npc.id,
+                    target_id=None,
+                    action_type=ActionType.NPC_SPAWN,
+                    happened_at_second=second,
+                )
+            )
 
     @staticmethod
     def _process_stun_ticks(match: Match, second: int) -> None:
@@ -229,6 +253,9 @@ class MatchSimulator:
         """Marca um jogador como fugitivo da partida."""
 
         actor.escaped = True
+        actor.escapes += 1
+        actor.stunned = False
+        actor.stunned_life = 0
         match.actions.append(
             new_match_action(
                 match_id=match.id,
@@ -239,3 +266,12 @@ class MatchSimulator:
                 happened_at_second=second,
             )
         )
+
+    @staticmethod
+    def _finalize_players(match: Match, second: int) -> None:
+        """Garante que todos os jogadores terminem mortos ou fugitivos."""
+
+        for player in match.players:
+            if not player.alive or player.escaped:
+                continue
+            MatchSimulator._escape_match(match, player, second)

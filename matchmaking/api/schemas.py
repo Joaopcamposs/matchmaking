@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class BootstrapRequest(BaseModel):
     """Define os parâmetros para carga inicial do sistema."""
 
-    player_total: int = Field(default=100, ge=1, le=1_000)
+    player_total: int = Field(default=100, ge=1, le=1_000_000_0)
 
 
 class RunMatchmakingRequest(BaseModel):

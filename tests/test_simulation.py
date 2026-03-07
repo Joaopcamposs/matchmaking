@@ -57,3 +57,58 @@ def test_npc_can_only_stun_player() -> None:
     assert player.stunned is True
     assert player.alive is True
     assert match.actions[-1].action_type is ActionType.NPC_ATTACK
+
+
+def test_npcs_spawn_at_different_times() -> None:
+    """Garante que múltiplos NPCs entram em momentos diferentes."""
+
+    simulator = MatchSimulator()
+    player = MatchParticipant(id=uuid4(), name="Player", is_npc=False, karma=-0.5)
+    npcs = [
+        MatchParticipant(
+            id=uuid4(),
+            name=f"NPC {index}",
+            is_npc=True,
+            difficulty=1.0 + index,
+            life=60,
+            spawned=False,
+        )
+        for index in range(3)
+    ]
+    match = Match(
+        id=uuid4(),
+        players=[player],
+        npcs=npcs,
+        duration_seconds=12,
+        started_at=datetime.now(UTC),
+    )
+
+    simulator.simulate(match)
+
+    spawn_actions = [
+        action for action in match.actions if action.action_type is ActionType.NPC_SPAWN
+    ]
+    assert len(spawn_actions) == 3
+    assert len({action.happened_at_second for action in spawn_actions}) > 1
+
+
+def test_all_players_finish_dead_or_escaped() -> None:
+    """Garante que a soma de mortos e fugitivos fecha o total inicial."""
+
+    simulator = MatchSimulator()
+    players = [
+        MatchParticipant(id=uuid4(), name=f"Player {index}", is_npc=False)
+        for index in range(4)
+    ]
+    match = Match(
+        id=uuid4(),
+        players=players,
+        npcs=[],
+        duration_seconds=1,
+        started_at=datetime.now(UTC),
+    )
+
+    simulator.simulate(match)
+
+    total_finished = sum(player.escaped or not player.alive for player in match.players)
+    assert total_finished == len(match.players)
